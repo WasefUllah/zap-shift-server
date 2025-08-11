@@ -2,7 +2,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -28,7 +28,12 @@ async function run() {
 
     // GET APIs
     app.get("/parcels", async (req, res) => {
-      const parcels = await parcelCollection.find().toArray();
+      const userEmail = req.query.email;
+      const query = userEmail ? { createdBy: userEmail } : {};
+      const option = {
+        sort: { createdAt: -1 },
+      };
+      const parcels = await parcelCollection.find(query, option).toArray();
       res.send(parcels);
     });
 
@@ -37,6 +42,15 @@ async function run() {
       const parcelData = req.body;
       const result = await parcelCollection.insertOne(parcelData);
       res.status(201).send(result);
+    });
+
+    // DELETE APIs
+    app.delete("/parcels/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await parcelCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
@@ -52,7 +66,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("Pro-fast!");
 });
 
 app.listen(port, () => {
