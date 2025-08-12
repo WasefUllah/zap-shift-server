@@ -39,6 +39,10 @@ async function run() {
       const email = req.body.email;
       const userExist = await usersCollection.findOne({ email });
       if (userExist) {
+        const updateRes = await usersCollection.updateOne(
+          { email },
+          { $set: { lastLogin: new Date().toISOString() } }
+        );
         return res
           .status(200)
           .send({ message: "User already exists", inserted: false });
@@ -47,7 +51,6 @@ async function run() {
       const newUser = req.body;
       const result = await usersCollection.insertOne(newUser);
       res.send(result);
-      
     });
 
     app.post("/parcels", async (req, res) => {
