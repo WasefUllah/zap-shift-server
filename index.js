@@ -31,6 +31,7 @@ async function run() {
 
     const db = client.db("zap-shift");
     const parcelCollection = db.collection("parcels");
+    const paymentCollection = db.collection("payment");
 
     // POST APIs
     app.post("/parcels", async (req, res) => {
@@ -45,19 +46,40 @@ async function run() {
         amount: amountInCents,
         currency: "usd",
         payment_method_types: ["card"],
-        // ui_mode: "custom",
-        // line_items: [
-        //   {
-        //     // Provide the exact Price ID (e.g. price_1234) of the product you want to sell
-        //     price: "{{PRICE_ID}}",
-        //     quantity: 1,
-        //   },
-        // ],
-        // mode: "payment",
-        // return_url: `${YOUR_DOMAIN}/complete?session_id={CHECKOUT_SESSION_ID}`,
       });
-
       res.send({ clientSecret: session.client_secret });
+    });
+
+    app.post("/payment", async (req, res) => {
+      const { parcelId, email, amount, paymentMethod, transactionId } =
+        req.body;
+      const updateResult = await parcelCollection.updateOne(
+        { _id: new ObjectId(parcelId) },
+        { $set: { paymentStatus: "paid" } }
+      );
+
+      if (updateResult.modifiedCount == 0) {
+        return res
+          .status(404)
+          .send({ message: "Parcel not found or already paid" });
+      }
+
+      const paymentDoc = {
+        parcelId,
+        email,
+        amount,
+        paymentMethod,
+        transactionId,
+        paidAt: new Date(),
+        paidAtString: new Date().toISOString(),
+      };
+
+      const paymentResult = await paymentCollection.insertOne(paymentDoc);
+
+      res.status(201).send({
+        message: "Payment is done",
+        insertedId: paymentResult.insertedId,
+      });
     });
 
     // GET APIs
@@ -89,6 +111,14 @@ async function run() {
         payment_intent_id: session.payment_intent.id,
         payment_intent_status: session.payment_intent.status,
       });
+    });
+
+    app.get("/payments", async (req, res) => {
+      const userEmail = req.query.email;
+      const query = userEmail ? { email: userEmail } : {};
+      const option = { sort: { paidAt: -1 } };
+      const payments = await paymentCollection.find(query, option).toArray();
+      res.send(payments);
     });
 
     // DELETE APIs
