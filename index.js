@@ -6,6 +6,12 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 
+const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY, {
+  apiVersion: "2025-07-30.basil",
+});
+
+const YOUR_DOMAIN = "http://localhost:3000";
+
 app.use(cors());
 app.use(express.json());
 
@@ -26,6 +32,34 @@ async function run() {
     const db = client.db("zap-shift");
     const parcelCollection = db.collection("parcels");
 
+    // POST APIs
+    app.post("/parcels", async (req, res) => {
+      const parcelData = req.body;
+      const result = await parcelCollection.insertOne(parcelData);
+      res.status(201).send(result);
+    });
+
+    app.post("/create-checkout-session", async (req, res) => {
+      const amountInCents = req.body.amountInCents;
+      const session = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: "usd",
+        payment_method_types: ["card"],
+        // ui_mode: "custom",
+        // line_items: [
+        //   {
+        //     // Provide the exact Price ID (e.g. price_1234) of the product you want to sell
+        //     price: "{{PRICE_ID}}",
+        //     quantity: 1,
+        //   },
+        // ],
+        // mode: "payment",
+        // return_url: `${YOUR_DOMAIN}/complete?session_id={CHECKOUT_SESSION_ID}`,
+      });
+
+      res.send({ clientSecret: session.client_secret });
+    });
+
     // GET APIs
     app.get("/parcels", async (req, res) => {
       const userEmail = req.query.email;
@@ -37,11 +71,24 @@ async function run() {
       res.send(parcels);
     });
 
-    // POST APIs
-    app.post("/parcels", async (req, res) => {
-      const parcelData = req.body;
-      const result = await parcelCollection.insertOne(parcelData);
-      res.status(201).send(result);
+    app.get("/parcels/:id", async (req, res) => {
+      const id = req.params.id;
+      const parcel = await parcelCollection.findOne({ _id: new ObjectId(id) });
+      res.send(parcel);
+    });
+
+    app.get("/session-status", async (req, res) => {
+      const session = await stripe.checkout.sessions.retrieve(
+        req.query.session_id,
+        { expand: ["payment_intent"] }
+      );
+
+      res.send({
+        status: session.status,
+        payment_status: session.payment_status,
+        payment_intent_id: session.payment_intent.id,
+        payment_intent_status: session.payment_intent.status,
+      });
     });
 
     // DELETE APIs
