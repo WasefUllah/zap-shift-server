@@ -41,11 +41,11 @@ async function run() {
     const paymentCollection = db.collection("payment");
     const usersCollection = db.collection("users");
 
-    // custom middle-wire
+    // custom middleware
     const verifyFbToken = async (req, res, next) => {
       const authHeader = req.headers.authorization;
       // console.log(req.headers)
-      // console.log("token in middle wire", authHeader);
+      // console.log("token in middleware", authHeader);
       if (!authHeader) {
         return res.status(401).send({ message: "unauthorized access" });
       }
