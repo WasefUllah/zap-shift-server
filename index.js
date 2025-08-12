@@ -82,6 +82,17 @@ async function run() {
       });
     });
 
+    app.post("/tracking", async (req, res) => {
+      const { trackingId, parcelId, status, message, updatedBy } = req.body;
+      const log = {
+        trackingId,
+        parcelId: parcelId ? new ObjectId(parcelId) : undefined,
+        status,
+        message,
+        updatedBy,
+      };
+    });
+
     // GET APIs
     app.get("/parcels", async (req, res) => {
       const userEmail = req.query.email;
