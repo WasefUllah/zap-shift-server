@@ -2,12 +2,19 @@ const dotenv = require("dotenv");
 dotenv.config();
 const express = require("express");
 const cors = require("cors");
+const admin = require("firebase-admin");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 
 const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY, {
   apiVersion: "2025-07-30.basil",
+});
+
+const serviceAccount = require("./zap-shift-adminsdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const YOUR_DOMAIN = "http://localhost:3000";
@@ -33,6 +40,24 @@ async function run() {
     const parcelCollection = db.collection("parcels");
     const paymentCollection = db.collection("payment");
     const usersCollection = db.collection("users");
+
+    // custom middle-wire
+    const verifyFbToken = async (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      // console.log(req.headers)
+      // console.log("token in middle wire", authHeader);
+      if (!authHeader) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+
+      const token = authHeader.split(" ")[1];
+      // console.log(token);
+      if (!token) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+
+      next();
+    };
 
     // POST APIs
     app.post("/users", async (req, res) => {
@@ -113,7 +138,7 @@ async function run() {
     });
 
     // GET APIs
-    app.get("/parcels", async (req, res) => {
+    app.get("/parcels", verifyFbToken, async (req, res) => {
       const userEmail = req.query.email;
       const query = userEmail ? { createdBy: userEmail } : {};
       const option = {
